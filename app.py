@@ -10,21 +10,32 @@ import re
 import urllib.request
 import zipfile
 import json
+import sys
+import ctypes
 
 
 def get_screen_size():
     """
-    Parses the output of xdpyinfo to get the screen dimensions.
+    Gets the screen dimensions for the primary monitor.
     """
-    try:
-        result = subprocess.run(['xdpyinfo'], capture_output=True, text=True, check=True)
-        match = re.search(r'dimensions:\s+(\d+)x(\d+)', result.stdout)
-        if match:
-            width = int(match.group(1))
-            height = int(match.group(2))
-            return width, height
-    except (subprocess.CalledProcessError, FileNotFoundError, AttributeError):
-        print("Warning: xdpyinfo not found or failed. Falling back to 1024x768.")
+    if sys.platform == "win32":
+        user32 = ctypes.windll.user32
+        width = user32.GetSystemMetrics(0)
+        height = user32.GetSystemMetrics(1)
+        return width, height
+    elif sys.platform == "linux":
+        try:
+            result = subprocess.run(['xdpyinfo'], capture_output=True, text=True, check=True)
+            match = re.search(r'dimensions:\s+(\d+)x(\d+)', result.stdout)
+            if match:
+                width = int(match.group(1))
+                height = int(match.group(2))
+                return width, height
+        except (subprocess.CalledProcessError, FileNotFoundError, AttributeError):
+            print("Warning: xdpyinfo not found or failed. Falling back to 1024x768.")
+            return 1024, 768
+    else:
+        print(f"Warning: Unsupported OS '{sys.platform}'. Falling back to 1024x768.")
         return 1024, 768
 
 
@@ -33,38 +44,49 @@ def record_media(output_filename="output.mp4", duration=5, record_audio=True):
     Records screen and audio for a given duration using ffmpeg.
     """
     screen_width, screen_height = get_screen_size()
-    display = os.environ.get('DISPLAY')
-    if not display:
-        print("Error: DISPLAY environment variable not set.")
-        return
+    command = []
 
     print(f"Recording for {duration} seconds using ffmpeg...")
 
-    command = [
-        'ffmpeg',
-        '-y',  # Overwrite output file if it exists
-        '-f', 'x11grab',
-        '-video_size', f'{screen_width}x{screen_height}',
-        '-i', display,
-    ]
+    if sys.platform == "linux":
+        display = os.environ.get('DISPLAY')
+        if not display:
+            print("Error: DISPLAY environment variable not set. Cannot record screen on Linux.")
+            return
 
-    if record_audio:
-        command.extend([
-            '-f', 'alsa',
-            '-i', 'hw:0',  # Default audio device
-            '-acodec', 'aac', # Audio codec
-            '-strict', 'experimental'
-        ])
+        command = [
+            'ffmpeg', '-y', '-f', 'x11grab',
+            '-video_size', f'{screen_width}x{screen_height}',
+            '-i', display,
+        ]
+        if record_audio:
+            command.extend(['-f', 'alsa', '-i', 'hw:0'])
+
+    elif sys.platform == "win32":
+        command = [
+            'ffmpeg', '-y', '-f', 'gdigrab',
+            '-video_size', f'{screen_width}x{screen_height}',
+            '-i', 'desktop',
+        ]
+        if record_audio:
+            # Note: The user may need to change 'Stereo Mix' to their specific audio device.
+            # They can find device names with: ffmpeg -list_devices true -f dshow -i dummy
+            command.extend(['-f', 'dshow', '-i', 'audio=Stereo Mix'])
+
+    else:
+        print(f"Recording not supported on this OS: {sys.platform}")
+        return
 
     command.extend([
         '-t', str(duration),
-        '-vcodec', 'libx264', # Video codec
+        '-vcodec', 'libx264',
+        '-acodec', 'aac',
+        '-strict', 'experimental',
         output_filename
     ])
 
     try:
         print(f"Running ffmpeg command: {' '.join(command)}")
-        # In a real app, you might want to hide the output unless there's an error
         subprocess.run(command, check=True)
         print(f"Finished recording. Media saved to {output_filename}")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:

@@ -1,14 +1,14 @@
 # Screen and Audio Summarizer
 
-This is a command-line application that records your screen and audio, then generates a summary of the content. It uses Optical Character Recognition (OCR) to extract text from the screen and a speech-to-text engine to transcribe the audio.
+This is a cross-platform command-line application that records your screen and audio, then generates a summary of the content. It uses Optical Character Recognition (OCR) to extract text from the screen and a speech-to-text engine to transcribe the audio.
 
 ## Dependencies
 
 This application relies on several external command-line tools. Please ensure they are installed on your system.
 
-### System Dependencies
+### System Dependencies (Linux)
 
-On a Debian/Ubuntu-based system, you can install them with the following command:
+On a Debian/Ubuntu-based system, you can install the required tools with the following command:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y \
@@ -20,6 +20,15 @@ sudo apt-get update && sudo apt-get install -y \
     imagemagick \
     alsa-utils
 ```
+
+### System Dependencies (Windows)
+
+**Experimental Support:** The implementation for Windows is experimental and has not been tested in a real Windows environment.
+
+You will need to install the following tools:
+
+1.  **FFmpeg:** Download and install FFmpeg for Windows from the [official website](https://ffmpeg.org/download.html) and ensure the `ffmpeg.exe` binary is in your system's PATH.
+2.  **Tesseract OCR:** Download and install Tesseract from the [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) page. Ensure the `tesseract.exe` binary is in your system's PATH.
 
 ### Python Dependencies
 
@@ -43,15 +52,31 @@ This will download and extract a small English language model (about 40MB) into 
 
 The application is controlled via command-line arguments.
 
-### Basic Usage
+### Basic Usage (Linux)
 
 To record your screen and audio for 10 seconds and then generate a summary:
 
 ```bash
-# Note: In a headless environment or from a script, you may need to run
+# Note: In a headless environment or from a script, you must run
 # the application inside a virtual framebuffer like Xvfb.
 xvfb-run python3 app.py --duration 10
 ```
+
+### Basic Usage (Windows)
+
+To record your screen and audio for 10 seconds:
+
+```powershell
+python3 app.py --duration 10
+```
+
+**Important:** The application defaults to using an audio device named "Stereo Mix" for recording system audio. This may not be correct for your system. To find the list of available audio devices, run the following `ffmpeg` command:
+
+```powershell
+ffmpeg -list_devices true -f dshow -i dummy
+```
+
+Look for the name of your microphone or system audio device in the output and provide it to the application (this currently requires modifying the `app.py` script directly).
 
 ### Command-Line Arguments
 
